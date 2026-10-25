@@ -30,6 +30,17 @@ To turn the hourly check off later: Task Scheduler → *Apollo - check for new v
 Only one transcription job runs at a time: if the hourly check fires while you're transcribing in the app,
 it leaves new videos queued for later instead of running a second job.
 
+## Windows: from VS Code
+
+1. Unzip the download, then in VS Code: **File → Open Folder…** → pick the unzipped `Apollo-main` folder.
+   If asked "Do you trust the authors?", click **Yes, I trust the authors** (tasks don't run otherwise).
+2. **Terminal → Run Task… → Apollo: Install (first time)**. Same installer as `install.bat`, but it installs
+   into *this* folder so VS Code and Apollo share it. Answer its question in the terminal at the end.
+3. From then on: **Terminal → Run Build Task** (Ctrl+Shift+B) starts Apollo, or press **F5** to run it under the debugger.
+   Stop it with the trash-can icon on its terminal.
+
+Other tasks: *Apollo: Smoke test (3 Diary of a CEO episodes)*, *Apollo: Update*, *Apollo: Run tests*.
+
 ## Manual setup (macOS / Linux / advanced)
 
 ```bash

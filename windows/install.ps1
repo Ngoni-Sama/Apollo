@@ -13,7 +13,8 @@
 param(
     [string]$Channel = "@TheDiaryOfACEO",
     [switch]$NoSchedule,
-    [switch]$NoChannel
+    [switch]$NoChannel,
+    [switch]$InPlace      # install into the folder that contains install.bat (used by the VS Code task)
 )
 
 $ErrorActionPreference = "Stop"
@@ -123,7 +124,7 @@ Step "Putting Apollo in place"
 # checkout (so "Update Apollo" works). Anything unexpected -> install right here instead.
 $Here = (Resolve-Path (Split-Path -Parent $PSScriptRoot)).Path   # folder that contains install.bat
 $Target = Join-Path $env:USERPROFILE "Apollo"
-if (Test-Path (Join-Path $Here ".git")) {
+if ($InPlace -or (Test-Path (Join-Path $Here ".git"))) {
     $Root = $Here
     Ok "Using this folder: $Root"
 } elseif (Test-Path (Join-Path $Target ".git")) {

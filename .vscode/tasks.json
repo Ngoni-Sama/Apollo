@@ -1,0 +1,54 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Apollo: Install (first time)",
+      "detail": "Installs everything into this folder, sets up The Diary Of A CEO, then opens Apollo",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\windows\\install.ps1", "-InPlace"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Apollo: Start",
+      "detail": "Starts Apollo and opens it in your browser (stop with the trash-can icon in the terminal)",
+      "type": "process",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["src\\ui.py", "--open"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Apollo: Smoke test (3 Diary of a CEO episodes)",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-Command",
+        "$u = Get-Content data\\manifest\\youtube\\TheDiaryOfACEO.jsonl -TotalCount 3 | ForEach-Object { '--youtube'; ($_ | ConvertFrom-Json).url }; & .venv\\Scripts\\python.exe scripts\\smoke_test.py @u"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Apollo: Update",
+      "detail": "Close Apollo first",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\windows\\update.ps1"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Apollo: Run tests",
+      "type": "process",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "pytest", "-q"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}
