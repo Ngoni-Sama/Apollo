@@ -1,0 +1,10 @@
+# Pinned versions verified 2026-10-25 (PyPI release + upstream last commit).
+youtube-transcript-api==1.2.4   # instance API: YouTubeTranscriptApi().fetch(...)
+yt-dlp==2026.10.21              # keep fresh: pip install -U yt-dlp when a platform breaks
+TikTokApi==7.3.3                # needs a Chromium for Playwright (see README)
+faster-whisper==1.2.1           # local ASR (CPU int8 or NVIDIA GPU)
+av>=11,<19                      # faster-whisper 1.2.1 passes metadata_errors=, removed in PyAV 19
+python-dotenv==1.2.4
+
+# dev
+pytest==9.1.1

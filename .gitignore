@@ -1,0 +1,18 @@
+# secrets / cookies
+.env
+*.cookies.txt
+cookies.txt
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# large / regenerable local data
+models/
+data/audio/
+data/transcripts/**/*.json
+data/manifest/**/*.jsonl
+data/dataset/**/*.jsonl
+!data/**/.gitkeep
