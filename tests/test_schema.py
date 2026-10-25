@@ -38,3 +38,9 @@ def test_paths_and_write(data_dir):
                            method="asr", language="en", segments=[seg(0, 1, "a")])
     schema.write_record(r, p)
     assert json.loads(p.read_text())["creator"] == "c"
+
+
+def test_safe_name_cannot_escape_directory():
+    for evil in ["..", "@..", "../x", ".hidden", "a/../../b"]:
+        name = schema.safe_name(evil)
+        assert "/" not in name and not name.startswith(".")

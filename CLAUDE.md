@@ -96,6 +96,8 @@ src/
   transcribe.py        # faster-whisper / whisper.cpp adapter + ffmpeg helpers
   manifest.py          # manifest JSONL I/O (kept out of enumerate.py: `import enumerate` would shadow the builtin)
   enumerate.py         # channel -> manifest
+  ui.py                # local web UI (stdlib http.server, 127.0.0.1 only); jobs = fixed CLI subprocesses, one at a time
+  ui_static/index.html # the UI page: vanilla JS, data rendered via textContent only (titles come from external feeds)
   watch.py             # new-upload watcher: YouTube RSS feed / TikTok best-effort -> manifest (+ opt-in ntfy alert)
   clean.py             # filler/noise removal, sponsor-segment heuristics
   chunk.py             # token-estimate chunking + topic tags

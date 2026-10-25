@@ -32,7 +32,20 @@ System requirements: `ffmpeg` on PATH. For YouTube, yt-dlp needs a JavaScript ru
   ```
   then set `WHISPER_BACKEND=whisper.cpp`, `WHISPER_CPP_BIN=.../build/bin/whisper-cli`, `WHISPER_CPP_MODEL=.../models/ggml-base.en.bin`.
 
-## Usage
+## The app (recommended)
+
+```bash
+python src/ui.py --open        # opens http://127.0.0.1:8765 in your browser
+```
+
+- **Dashboard:** check for new videos (optionally transcribing them), transcribe a single URL, follow the current job's live log and stop it, and see recently detected videos.
+- **Creators:** add or remove creators, list a channel's whole back catalogue, and transcribe everything waiting.
+- **Transcripts:** full-text search across every transcript. Click a timestamp to open the YouTube video at that moment.
+- **Dataset:** rebuild `chunks.jsonl` / `qa.jsonl`, and run the smoke test on a few URLs.
+
+The app only listens on your own computer (127.0.0.1). Long tasks run one at a time in the background, using the same commands as below, so the 2-second throttle still applies. Keep the terminal window open while you use it. Scheduled checks (see "Getting new-video updates") work whether or not the app is running.
+
+## Command line
 
 ```bash
 # 1. ALWAYS smoke-test first (3-5 real URLs; --audio checks ASR offline)

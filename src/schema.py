@@ -92,7 +92,8 @@ def validate_record(record: dict) -> None:
 def safe_name(value: str) -> str:
     """Make a creator handle / id safe for use as a path component."""
     value = value.strip().lstrip("@")
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", value) or "_"
+    value = re.sub(r"[^A-Za-z0-9._-]+", "_", value).lstrip(".")  # no "..", no hidden files
+    return value or "_"
 
 
 def transcript_path(platform: str, creator: str, video_id: str, *, raw: bool = False) -> Path:

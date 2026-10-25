@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apollo</title>
+<style>
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6860; --line: #e4e1d8;
+  --accent: #b7791f; --accent-ink: #ffffff; --accent-soft: #fbf1df;
+  --ok: #2f7d4f; --warn: #a15c07; --bad: #b42318; --mark: #ffe8a3;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141412; --panel: #1d1c1a; --ink: #ecebe6; --muted: #a29f95; --line: #33312c;
+    --accent: #e0a645; --accent-ink: #1a1408; --accent-soft: #2e2615;
+    --ok: #5cc48a; --warn: #e8a54b; --bad: #f2776b; --mark: #5c4a17;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line);
+  background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 18px; letter-spacing: .2px; }
+.brand svg { color: var(--accent); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); font: inherit; cursor: pointer; }
+nav button[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+#jobpill { margin-left: auto; font-size: 13px; color: var(--muted); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+section[hidden] { display: none; }
+h2 { font-size: 16px; margin: 28px 0 10px; }
+h2:first-child { margin-top: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.stat .n { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat .l { color: var(--muted); font-size: 13px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1 1 260px; min-width: 0; }
+input[type=text], input[type=search], select, textarea {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+textarea { width: 100%; min-height: 90px; font-family: var(--mono); font-size: 13px; }
+button.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+button.btn:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.num { font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+.badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.badge.ok { color: var(--ok); border-color: currentColor; }
+.badge.warn { color: var(--warn); border-color: currentColor; }
+.badge.bad { color: var(--bad); border-color: currentColor; }
+.badge.run { color: var(--accent); border-color: currentColor; }
+pre.log { font-family: var(--mono); font-size: 12px; line-height: 1.45; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; }
+.list { display: grid; gap: 8px; }
+.item { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.item.clickable { cursor: pointer; }
+.item.clickable:hover { border-color: var(--accent); }
+.item .meta { color: var(--muted); font-size: 13px; }
+mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 2px; }
+a { color: var(--accent); }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+.viewer { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; }
+.seg { display: grid; grid-template-columns: 56px 1fr; gap: 8px; padding: 4px 0; }
+.seg a { font-family: var(--mono); font-size: 12px; text-decoration: none; padding-top: 2px; }
+.empty { color: var(--muted); padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: 10px; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: min(92vw, 640px); opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: 1; }
+@media (max-width: 640px) {
+  #creator-table thead { display: none; }
+  #creator-table, #creator-table tbody, #creator-table tr, #creator-table td { display: block; width: 100%; }
+  #creator-table tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  #creator-table td { border: 0; padding: 2px 0; }
+  #creator-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); }
+  #creator-table td.num { display: inline-block; width: auto; margin-right: 14px; }
+  #creator-table .actions { justify-content: flex-start !important; margin-top: 8px; }
+}
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/>
+    </svg>
+    Apollo
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="dashboard" aria-selected="true">Dashboard</button>
+    <button role="tab" data-tab="creators" aria-selected="false">Creators</button>
+    <button role="tab" data-tab="transcripts" aria-selected="false">Transcripts</button>
+    <button role="tab" data-tab="dataset" aria-selected="false">Dataset</button>
+  </nav>
+  <div id="jobpill"></div>
+</header>
+
+<main>
+  <section id="tab-dashboard">
+    <div class="stats">
+      <div class="panel stat"><div class="n" id="s-watching">–</div><div class="l">Creators watched</div></div>
+      <div class="panel stat"><div class="n" id="s-transcripts">–</div><div class="l">Transcripts</div></div>
+      <div class="panel stat"><div class="n" id="s-pending">–</div><div class="l">Waiting to transcribe</div></div>
+      <div class="panel stat"><div class="n" id="s-failed">–</div><div class="l">Failed</div></div>
+    </div>
+
+    <h2>Actions</h2>
+    <div class="panel">
+      <div class="row">
+        <button class="btn primary" id="btn-check">Check for new videos</button>
+        <label class="check"><input type="checkbox" id="chk-transcribe"> and transcribe them</label>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <input type="text" id="one-url" class="grow" placeholder="Paste a YouTube or TikTok video URL">
+        <input type="text" id="one-creator" placeholder="creator (optional)" style="width:180px">
+        <button class="btn" id="btn-one">Transcribe</button>
+      </div>
+    </div>
+
+    <h2>Current job</h2>
+    <div class="panel" id="jobpanel">
+      <div class="row">
+        <strong id="job-name" class="grow">No job has run yet</strong>
+        <span id="job-badge"></span>
+        <button class="btn danger" id="btn-stop" hidden>Stop</button>
+      </div>
+      <pre class="log" id="job-log" hidden></pre>
+    </div>
+
+    <h2>New videos detected</h2>
+    <div id="newlist" class="list"></div>
+  </section>
+
+  <section id="tab-creators" hidden>
+    <h2>Add a creator</h2>
+    <div class="panel">
+      <div class="row">
+        <select id="add-platform"><option value="youtube">YouTube</option><option value="tiktok">TikTok</option></select>
+        <input type="text" id="add-channel" class="grow" placeholder="@handle">
+        <label class="check"><input type="checkbox" id="add-backfill"> also queue their latest uploads</label>
+        <button class="btn primary" id="btn-add">Add</button>
+      </div>
+      <p class="muted small" style="margin:10px 0 0">
+        New uploads are found by "Check for new videos". YouTube uses the official channel feed.
+        TikTok is best-effort: only the latest 10 videos are looked at, and checks can fail when TikTok blocks bots.
+      </p>
+    </div>
+
+    <h2>Creators</h2>
+    <div class="panel tablewrap">
+      <table id="creator-table">
+        <thead><tr><th>Creator</th><th>Last checked</th><th class="num">Done</th><th class="num">Waiting</th><th class="num">Failed</th><th></th></tr></thead>
+        <tbody id="creator-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-transcripts" hidden>
+    <div class="row" style="margin-bottom:14px">
+      <input type="search" id="q" class="grow" placeholder="Search all transcripts…">
+      <select id="q-creator"><option value="">All creators</option></select>
+    </div>
+    <div class="split">
+      <div id="results" class="list"></div>
+      <div id="viewer" class="panel viewer"><div class="muted">Select a transcript to read it.</div></div>
+    </div>
+  </section>
+
+  <section id="tab-dataset" hidden>
+    <h2>Training data</h2>
+    <div class="stats">
+      <div class="panel stat"><div class="n" id="d-chunks">–</div><div class="l">Chunks (RAG / pretraining)</div></div>
+      <div class="panel stat"><div class="n" id="d-qa">–</div><div class="l">Q&amp;A pairs</div></div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div class="row">
+        <button class="btn primary" id="btn-dataset">Rebuild dataset</button>
+        <span class="muted small">Writes data/dataset/chunks.jsonl and qa.jsonl from every cleaned transcript.</span>
+      </div>
+    </div>
+
+    <h2>Smoke test</h2>
+    <div class="panel">
+      <p class="muted small" style="margin-top:0">Run this before a big job: checks every stage on 1–5 real URLs, one per line.</p>
+      <textarea id="smoke-urls" placeholder="https://www.youtube.com/watch?v=…&#10;https://www.tiktok.com/@creator/video/…"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" id="btn-smoke">Run smoke test</button></div>
+    </div>
+  </section>
+</main>
+<footer>Personal study only. Don't republish transcripts or train commercial products on creator content.</footer>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+// Build DOM safely: all data goes in via textContent, never innerHTML.
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false)
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 4500);
+}
+
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "never";
+const fmtYmd = (s) => s && s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}` : "";
+const fmtDur = (sec) => { sec = Math.round(sec || 0); const m = Math.floor(sec / 60), s = sec % 60; return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s).padStart(2, "0")}`; };
+const platformLabel = (p) => p === "youtube" ? "YouTube" : "TikTok";
+
+// ---------- tabs ----------
+let currentTab = "dashboard";
+function showTab(name) {
+  currentTab = name;
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  document.querySelectorAll("main > section").forEach(s => s.hidden = s.id !== `tab-${name}`);
+  try { localStorage.setItem("apollo-tab", name); } catch (_) {}
+  refresh();
+}
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+// ---------- jobs ----------
+async function startJob(body) {
+  try {
+    const job = await api("/api/jobs", body);
+    toast(`Started: ${job.name}`);
+    if (currentTab !== "dashboard") showTab("dashboard");
+    pollJob();
+  } catch (e) { toast(e.message); }
+}
+
+function jobBadge(job) {
+  if (!job) return "";
+  if (job.running) return h("span", { class: "badge run" }, "running");
+  const cls = job.returncode === 0 ? "ok" : job.returncode === 2 ? "bad" : "warn";
+  return h("span", { class: `badge ${cls}` }, job.outcome);
+}
+
+let pollTimer;
+async function pollJob() {
+  clearTimeout(pollTimer);
+  let job = null;
+  try { job = await api("/api/job"); } catch (_) {}
+  $("jobpill").replaceChildren(job && job.running ? h("span", {}, "⏳ ", job.name) : "");
+  if (job) {
+    $("job-name").textContent = job.name;
+    $("job-badge").replaceChildren(jobBadge(job));
+    $("btn-stop").hidden = !job.running;
+    const log = $("job-log");
+    const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
+    log.hidden = false;
+    log.textContent = job.lines.join("\n") || "(no output yet)";
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  }
+  const running = job && job.running;
+  if (!running && pollJob.wasRunning) refresh();
+  pollJob.wasRunning = running;
+  pollTimer = setTimeout(pollJob, running ? 1200 : 5000);
+}
+$("btn-stop").addEventListener("click", async () => { await api("/api/jobs/stop", {}); toast("Stopping…"); pollJob(); });
+
+// ---------- dashboard ----------
+async function loadDashboard() {
+  const [s, news] = await Promise.all([api("/api/status"), api("/api/new")]);
+  $("s-watching").textContent = s.watching; $("s-transcripts").textContent = s.transcripts;
+  $("s-pending").textContent = s.pending; $("s-failed").textContent = s.failed;
+  const list = $("newlist");
+  if (!news.length) {
+    list.replaceChildren(h("div", { class: "empty" }, s.watching
+      ? "No new videos yet. Click “Check for new videos”, or schedule watch.py check to run hourly."
+      : "Add a creator on the Creators tab to start watching for new uploads."));
+    return;
+  }
+  list.replaceChildren(...news.map(n => h("div", { class: "item" },
+    h("div", {}, h("a", { href: n.url, target: "_blank", rel: "noopener noreferrer" }, n.title || n.url)),
+    h("div", { class: "meta" }, `${platformLabel(n.platform)} · ${n.creator} · uploaded ${fmtYmd(n.upload_date) || "?"} · detected ${fmtDate(n.detected_at)}`))));
+}
+$("btn-check").addEventListener("click", () => startJob({ kind: "check", transcribe: $("chk-transcribe").checked }));
+$("btn-one").addEventListener("click", () => {
+  const url = $("one-url").value.trim();
+  if (!url) return toast("Paste a video URL first");
+  startJob({ kind: "transcribe_url", url, creator: $("one-creator").value.trim() || undefined });
+});
+
+// ---------- creators ----------
+async function loadCreators() {
+  const [watching, manifests] = await Promise.all([api("/api/watchlist"), api("/api/manifests")]);
+  const byKey = Object.fromEntries(manifests.map(m => [`${m.platform}/${m.creator}`, m]));
+  const keys = new Set(watching.map(w => `${w.platform}/${w.creator}`));
+  // Creators that have a manifest (from enumerate.py) but aren't watched still show up.
+  const rows = [...watching, ...manifests.filter(m => !keys.has(`${m.platform}/${m.creator}`))
+    .map(m => ({ platform: m.platform, creator: m.creator, unwatched: true }))];
+  const tbody = $("creator-rows");
+  if (!rows.length) {
+    tbody.replaceChildren(h("tr", {}, h("td", { colspan: 6, class: "muted" }, "No creators yet. Add one above.")));
+    return;
+  }
+  tbody.replaceChildren(...rows.map(w => {
+    const m = byKey[`${w.platform}/${w.creator}`] || { done: 0, pending: 0, failed: 0 };
+    return h("tr", {},
+      h("td", {}, h("strong", {}, w.creator), h("div", { class: "muted small" }, platformLabel(w.platform), w.unwatched ? " · not watched" : "")),
+      h("td", { class: "small", "data-label": "Last checked" }, w.unwatched ? "–" : fmtDate(w.last_checked)),
+      h("td", { class: "num", "data-label": "Done" }, m.done), h("td", { class: "num", "data-label": "Waiting" }, m.pending),
+      h("td", { class: "num", "data-label": "Failed" }, m.failed),
+      h("td", {}, h("div", { class: "row actions", style: "justify-content:flex-end" },
+        w.unwatched ? null : h("button", { class: "btn", title: "Find every video on the channel (one-off, can be slow)",
+          onclick: () => startJob({ kind: "enumerate", platform: w.platform, creator: w.creator }) }, "List all videos"),
+        h("button", { class: "btn", disabled: !(m.pending || m.failed) || null,
+          onclick: () => startJob({ kind: "transcribe_manifest", platform: w.platform, creator: w.creator }) }, "Transcribe waiting"),
+        w.unwatched ? null : h("button", { class: "btn danger", onclick: async () => {
+          if (!confirm(`Stop watching ${w.creator}? Transcripts are kept.`)) return;
+          await api("/api/unwatch", { platform: w.platform, creator: w.creator }); toast(`Stopped watching ${w.creator}`); refresh();
+        } }, "Remove"))));
+  }));
+}
+$("btn-add").addEventListener("click", async () => {
+  const channel = $("add-channel").value.trim();
+  if (!channel) return toast("Enter a @handle");
+  const btn = $("btn-add"); btn.disabled = true; btn.textContent = "Adding…";
+  try {
+    const r = await api("/api/watch", { platform: $("add-platform").value, channel, backfill: $("add-backfill").checked });
+    toast(`Watching ${r.creator}. ${r.baseline} existing uploads recorded as the starting point.`);
+    $("add-channel").value = ""; refresh();
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = "Add"; }
+});
+
+// ---------- transcripts ----------
+function highlight(text, q) {
+  if (!q) return [text];
+  const out = []; const lower = text.toLowerCase(); const ql = q.toLowerCase(); let i = 0, j;
+  while ((j = lower.indexOf(ql, i)) >= 0) { out.push(text.slice(i, j), h("mark", {}, text.slice(j, j + q.length))); i = j + q.length; }
+  out.push(text.slice(i)); return out;
+}
+function timeLink(rec, start) {
+  if (rec.platform !== "youtube") return null;
+  try { const u = new URL(rec.source_url); u.searchParams.set("t", `${Math.floor(start)}s`); return u.toString(); } catch (_) { return null; }
+}
+let searchTimer, activeQuery = "";
+async function loadTranscripts() {
+  const q = $("q").value.trim(); activeQuery = q;
+  const creator = $("q-creator").value;
+  const results = await api(`/api/transcripts?q=${encodeURIComponent(q)}&creator=${encodeURIComponent(creator)}`);
+  const sel = $("q-creator");
+  if (sel.options.length <= 1) {
+    const ms = await api("/api/manifests"); const names = new Set(ms.map(m => m.creator));
+    results.forEach(r => names.add(r.creator));
+    [...names].sort().forEach(n => sel.append(h("option", { value: n }, n)));
+  }
+  const box = $("results");
+  if (!results.length) { box.replaceChildren(h("div", { class: "empty" }, q ? `No transcripts mention “${q}”.` : "No transcripts yet.")); return; }
+  box.replaceChildren(...results.map(r => h("div", { class: "item clickable", tabindex: 0,
+      onclick: () => openTranscript(r), onkeydown: (e) => { if (e.key === "Enter") openTranscript(r); } },
+    h("div", { class: "meta" }, `${platformLabel(r.platform)} · ${r.creator} · ${fmtDur(r.duration_sec)} · ${r.words.toLocaleString()} words · ${r.method === "captions" ? "captions" : "Whisper"}`),
+    h("div", { class: "small" }, highlight(r.snippet, q)))));
+}
+async function openTranscript(r) {
+  const v = $("viewer"); v.replaceChildren(h("div", { class: "muted" }, "Loading…"));
+  try {
+    const rec = await api(`/api/transcript?platform=${r.platform}&creator=${encodeURIComponent(r.creator)}&video_id=${encodeURIComponent(r.video_id)}`);
+    v.replaceChildren(
+      h("div", { class: "row" },
+        h("strong", { class: "grow" }, `${rec.creator} · ${rec.video_id}`),
+        h("button", { class: "btn", onclick: () => navigator.clipboard.writeText(rec.text).then(() => toast("Copied full text")) }, "Copy text"),
+        h("a", { class: "btn", href: rec.source_url, target: "_blank", rel: "noopener noreferrer", style: "text-decoration:none" }, "Open video")),
+      h("div", { class: "muted small", style: "margin:6px 0 12px" },
+        `${platformLabel(rec.platform)} · ${fmtDur(rec.duration_sec)} · ${rec.method === "captions" ? "from captions" : "transcribed with Whisper"} · fetched ${fmtDate(rec.fetched_at)}`),
+      ...rec.segments.map(s => {
+        const link = timeLink(rec, s.start);
+        return h("div", { class: "seg" },
+          link ? h("a", { href: link, target: "_blank", rel: "noopener noreferrer", title: "Open at this moment" }, fmtDur(s.start))
+               : h("span", { class: "muted small", style: "font-family:var(--mono)" }, fmtDur(s.start)),
+          h("div", {}, highlight(s.text, activeQuery)));
+      }));
+  } catch (e) { v.replaceChildren(h("div", { class: "muted" }, e.message)); }
+}
+$("q").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadTranscripts, 250); });
+$("q-creator").addEventListener("change", loadTranscripts);
+
+// ---------- dataset ----------
+async function loadDataset() {
+  const s = await api("/api/status");
+  $("d-chunks").textContent = s.dataset.chunks.toLocaleString(); $("d-qa").textContent = s.dataset.qa.toLocaleString();
+}
+$("btn-dataset").addEventListener("click", () => startJob({ kind: "dataset" }));
+$("btn-smoke").addEventListener("click", () => {
+  const urls = $("smoke-urls").value.split(/\s+/).filter(Boolean);
+  if (!urls.length) return toast("Add 1–5 URLs");
+  startJob({ kind: "smoke", urls });
+});
+
+// ---------- boot ----------
+async function refresh() {
+  try {
+    if (currentTab === "dashboard") await loadDashboard();
+    else if (currentTab === "creators") await loadCreators();
+    else if (currentTab === "transcripts") await loadTranscripts();
+    else if (currentTab === "dataset") await loadDataset();
+  } catch (e) { toast(`Couldn't reach Apollo: ${e.message}`); }
+}
+let saved = "dashboard";
+try { saved = localStorage.getItem("apollo-tab") || "dashboard"; } catch (_) {}
+showTab(["dashboard", "creators", "transcripts", "dataset"].includes(saved) ? saved : "dashboard");
+pollJob();
+</script>
+</body>
+</html>
