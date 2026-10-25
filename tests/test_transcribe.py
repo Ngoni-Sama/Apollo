@@ -62,3 +62,36 @@ def test_to_wav_16k_local(tmp_path):
                             "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
     assert probe == "16000,1"
     assert abs(transcribe.probe_duration(out) - 1.0) < 0.1
+
+
+def test_cuda_failure_falls_back_to_cpu(tmp_path, monkeypatch, caplog):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"x")
+    devices = []
+
+    def loader(model, device, cache_dir):
+        devices.append(device)
+        m = MagicMock()
+        if device == "auto":
+            def boom():
+                raise RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+                yield
+            m.transcribe.return_value = (boom(), SimpleNamespace(language="en", duration=1.0))
+        else:
+            m.transcribe.return_value = (iter([SimpleNamespace(start=0, end=1, text="ok")]),
+                                         SimpleNamespace(language="en", duration=1.0))
+        return m
+    monkeypatch.setattr(transcribe, "_load_faster_whisper", loader)
+    res = transcribe.transcribe(audio, backend="faster-whisper", settings=Settings(whisper_device="auto"))
+    assert devices == ["auto", "cpu"] and res.segments[0]["text"] == "ok"
+    assert "using CPU instead" in caplog.text
+
+
+def test_non_gpu_errors_are_not_swallowed(tmp_path, monkeypatch):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"x")
+    m = MagicMock()
+    m.transcribe.side_effect = RuntimeError("Invalid data found when processing input")
+    monkeypatch.setattr(transcribe, "_load_faster_whisper", lambda *a: m)
+    with pytest.raises(RuntimeError, match="Invalid data"):
+        transcribe.transcribe(audio, backend="faster-whisper", settings=Settings(whisper_device="auto"))

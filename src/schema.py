@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 import config
+from fileio import atomic_write_text
 
 Platform = Literal["youtube", "tiktok"]
 Method = Literal["captions", "asr"]
@@ -105,8 +106,5 @@ def transcript_path(platform: str, creator: str, video_id: str, *, raw: bool = F
 def write_record(record: TranscriptRecord, path: Path) -> Path:
     """Validate and atomically write a record as pretty JSON."""
     validate_record(record)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    atomic_write_text(path, json.dumps(record, ensure_ascii=False, indent=2))
     return path

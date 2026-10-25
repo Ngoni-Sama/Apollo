@@ -10,6 +10,7 @@ import argparse
 import logging
 import sys
 import time
+from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -22,11 +23,19 @@ import tiktok_fetch
 import transcribe
 import youtube_captions
 from config import Settings, load_settings
+from fileio import LockBusy, file_lock
 from schema import Platform, Segment, make_record, transcript_path, write_record
 
 log = logging.getLogger(__name__)
 
 SPONSOR_FILTER_MIN_SEC = 120  # short-form clips rarely have ad reads; "link in bio" there is content
+EXIT_BUSY = 3  # another transcription job (UI or scheduled check) holds the job lock
+
+
+def job_lock() -> AbstractContextManager[None]:
+    """Only one transcription job at a time across processes (UI jobs + the scheduled check).
+    Raises LockBusy immediately if another job is running."""
+    return file_lock(config.DATA_DIR / ".job.lock")
 
 
 class PipelineError(Exception):
@@ -212,21 +221,22 @@ def process_manifest(path: Path, opts: Options, settings: Settings, sleep: float
                 process_url(item["url"], item_opts, settings)
                 item["status"] = "done"
                 item.pop("error", None)
+                manifest.patch(path, item["video_id"], {"status": "done"}, drop=("error",))
             except PlatformBlocked as exc:
                 log.error("platform is blocking requests; stopping without consuming retries: %s", exc)
                 blocked = True
+                break
             except (PipelineError, transcribe.TranscriptionError, ValueError) as exc:
                 item["attempts"] = item.get("attempts", 0) + 1
                 item["status"] = "failed"
                 item["error"] = str(exc)[:500]
+                manifest.patch(path, item["video_id"], {k: item[k] for k in ("status", "attempts", "error")})
                 log.error("failed %s (attempt %d/%d): %s", item["video_id"], item["attempts"],
                           manifest.MAX_ATTEMPTS, exc)
-            manifest.write_manifest(path, items)
-            if blocked:
-                break
             if n < len(batch) - 1:
                 time.sleep(sleep)
 
+    items = manifest.read_manifest(path)  # re-read: other processes may have queued new videos meanwhile
     counts = {s: sum(1 for i in items if i["status"] == s) for s in manifest.STATUSES}
     counts["permanently_failed"] = sum(1 for i in items if manifest.is_permanently_failed(i))
     counts["blocked"] = int(blocked)
@@ -256,6 +266,16 @@ def main(argv: list[str] | None = None) -> int:
     opts = Options(creator=args.creator, backend=args.backend, model=args.model, force=args.force,
                    keep_audio=args.keep_audio, sponsor_filter=not args.no_sponsor_filter)
 
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(job_lock())
+        except LockBusy:
+            log.warning("another Apollo transcription job is already running; try again when it finishes")
+            return EXIT_BUSY
+        return _run(args, opts, settings)
+
+
+def _run(args: argparse.Namespace, opts: Options, settings: Settings) -> int:
     if args.url:
         try:
             out = process_url(args.url, opts, settings)

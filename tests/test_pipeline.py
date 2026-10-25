@@ -150,3 +150,28 @@ def test_manifest_sleeps_between_items(data_dir, settings, monkeypatch):
     monkeypatch.setattr(pipeline.time, "sleep", sleeps.append)
     pipeline.process_manifest(path, pipeline.Options(), settings, sleep=2.0)
     assert sleeps == [2.0, 2.0]
+
+
+def test_videos_queued_during_a_run_are_not_lost(data_dir, settings, monkeypatch):
+    """watch.py may add videos to the manifest while a transcription job is running."""
+    path = data_dir / "manifest" / "youtube" / "C.jsonl"
+    manifest.write_manifest(path, [{"video_id": "a", "url": "ua"}, {"video_id": "b", "url": "ub"}])
+
+    def fake(url, opts, s):
+        if url == "ua":  # simulate the scheduled check queueing a new upload mid-run
+            manifest.add_items(path, [{"video_id": "new", "url": "unew", "status": "pending"}])
+        return data_dir / "x.json"
+    monkeypatch.setattr(pipeline, "process_url", fake)
+    counts = pipeline.process_manifest(path, pipeline.Options(), settings, sleep=0)
+    rows = {r["video_id"]: r["status"] for r in manifest.read_manifest(path)}
+    assert rows == {"a": "done", "b": "done", "new": "pending"}
+    assert counts["pending"] == 1
+
+
+def test_second_job_exits_busy(data_dir, monkeypatch, caplog):
+    path = data_dir / "manifest" / "youtube" / "C.jsonl"
+    manifest.write_manifest(path, [{"video_id": "a", "url": "ua"}])
+    monkeypatch.setattr(pipeline, "process_url", lambda *a: pytest.fail("must not run while busy"))
+    with pipeline.job_lock():
+        assert pipeline.main(["--manifest", str(path)]) == pipeline.EXIT_BUSY
+    assert "already running" in caplog.text

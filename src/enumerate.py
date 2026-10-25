@@ -112,9 +112,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         found = enumerate_tiktok(args.channel, args.limit)
 
-    items, added = manifest.merge(manifest.read_manifest(out), found)
-    manifest.write_manifest(out, items)
-    log.info("enumerated %d videos (%d new) -> %s (%d total in manifest)", len(found), added, out, len(items))
+    added = manifest.add_items(out, found)
+    total = len(manifest.read_manifest(out))
+    log.info("enumerated %d videos (%d new) -> %s (%d total in manifest)", len(found), added, out, total)
     if args.platform == "tiktok":
         log.warning("TikTok enumeration is best-effort: %d returned, the list may be INCOMPLETE.", len(found))
     if not found:

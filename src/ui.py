@@ -36,7 +36,8 @@ log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent / "ui_static"
 PLATFORMS = ("youtube", "tiktok")
-EXIT_MEANINGS = {0: "finished", 1: "finished with failures", 2: "stopped: platform is blocking your IP"}
+EXIT_MEANINGS = {0: "finished", 1: "finished with failures", 2: "stopped: platform is blocking your IP",
+                 3: "skipped: another transcription job is already running"}
 
 
 class ApiError(Exception):
@@ -86,8 +87,10 @@ class JobRunner:
             if self.current and self.current.running:
                 raise ApiError(HTTPStatus.CONFLICT, f"'{self.current.name}' is still running")
             job = Job(next(self._ids), name, args)
-            env = os.environ | {"PYTHONUNBUFFERED": "1"}
+            # UTF-8 everywhere: Windows pipes default to cp1252 and titles contain curly quotes/emoji.
+            env = os.environ | {"PYTHONUNBUFFERED": "1", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
             job.proc = subprocess.Popen([sys.executable, *args], cwd=self.cwd, env=env, text=True, bufsize=1,
+                                        encoding="utf-8", errors="replace",
                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             self.current = job
             self.history.appendleft(job)
@@ -368,9 +371,15 @@ def make_handler(app: App, port: int):
 
 
 def serve(port: int = 8765, open_browser: bool = False) -> None:
-    app = App()
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port))
     url = f"http://127.0.0.1:{port}"
+    app = App()
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port))
+    except OSError:
+        log.info("Apollo already seems to be running on port %d; opening it in the browser", port)
+        if open_browser:
+            webbrowser.open(url)
+        return
     log.info("Apollo UI running at %s  (Ctrl+C to stop)", url)
     if open_browser:
         threading.Timer(0.5, webbrowser.open, args=(url,)).start()

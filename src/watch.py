@@ -31,6 +31,7 @@ import config
 import downloader
 import enumerate as enumerate_mod
 import manifest
+from fileio import LockBusy, atomic_write_text
 from manifest import ManifestItem
 from schema import safe_name
 
@@ -69,9 +70,7 @@ def load_watchlist() -> list[WatchEntry]:
 def save_watchlist(entries: list[WatchEntry]) -> None:
     path = watchlist_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    atomic_write_text(path, json.dumps(entries, ensure_ascii=False, indent=2))
 
 
 def _now() -> str:
@@ -148,8 +147,7 @@ def add(platform: str, channel: str, backfill: bool = False, skip_shorts: bool =
     current = latest(entry)
     if backfill:
         queue = [i for i in current if not (entry["skip_shorts"] and is_short(i))]
-        items, added = manifest.merge(manifest.read_manifest(_manifest_path(entry)), queue)
-        manifest.write_manifest(_manifest_path(entry), items)
+        added = manifest.add_items(_manifest_path(entry), queue)
         log.info("queued %d current uploads in %s", added, _manifest_path(entry))
     entry["seen"] = [i["video_id"] for i in current]
     entry["last_checked"] = _now()
@@ -195,8 +193,7 @@ def check(sleep: float = config.DEFAULT_SLEEP_SEC) -> tuple[dict[str, list[Manif
         if not new:
             log.info("%s: nothing new", name)
             continue
-        items, _ = manifest.merge(manifest.read_manifest(path), new)
-        manifest.write_manifest(path, items)
+        manifest.add_items(path, new)
         found[str(path)] = new
         with log_path().open("a", encoding="utf-8") as f:
             for item in new:
@@ -225,8 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--transcribe", action="store_true", help="run the pipeline on manifests that got new videos")
     p.add_argument("--sleep", type=float, default=config.load_settings().sleep_sec)
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--log-file", type=Path, help="also append logs here (used by the scheduled task)")
     args = ap.parse_args(argv)
-    config.setup_logging(args.verbose)
+    config.setup_logging(args.verbose, args.log_file)
 
     if args.cmd == "add":
         try:
@@ -251,12 +249,17 @@ def main(argv: list[str] | None = None) -> int:
         import pipeline  # imported here: pulls in the ASR stack, not needed for a plain check
 
         settings = config.load_settings()
-        for path in found:
-            counts = pipeline.process_manifest(Path(path), pipeline.Options(), settings, args.sleep)
-            log.info("transcribed %s: %s", Path(path).name, counts)
-            if counts.get("blocked"):
-                log.error("platform blocked this IP; stopping transcription for this check")
-                return 2
+        try:
+            with pipeline.job_lock():
+                for path in found:
+                    counts = pipeline.process_manifest(Path(path), pipeline.Options(), settings, args.sleep)
+                    log.info("transcribed %s: %s", Path(path).name, counts)
+                    if counts.get("blocked"):
+                        log.error("platform blocked this IP; stopping transcription for this check")
+                        return 2
+        except LockBusy:
+            log.warning("another transcription job is running; new videos stay queued for it or the next check")
+            return pipeline.EXIT_BUSY
     return 1 if failed else 0
 
 

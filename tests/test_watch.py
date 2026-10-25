@@ -130,3 +130,35 @@ def test_skip_shorts_on_check_and_backfill(data_dir, feed):
 def test_skip_shorts_ignored_for_tiktok(data_dir, monkeypatch):
     monkeypatch.setattr(watch.enumerate_mod, "enumerate_tiktok", lambda channel, limit: [])
     assert watch.add("tiktok", "@coach", skip_shorts=True)["skip_shorts"] is False
+
+
+def test_transcribe_skipped_when_another_job_runs(data_dir, feed, monkeypatch):
+    import pipeline
+
+    watch.add("youtube", "@C")
+    feed["items"] = watch.parse_youtube_feed(FEED)
+    monkeypatch.setattr(pipeline, "process_manifest", lambda *a, **k: pytest.fail("must not transcribe"))
+    with pipeline.job_lock():
+        assert watch.main(["check", "--transcribe", "--sleep", "0"]) == pipeline.EXIT_BUSY
+    # the new video stays queued for later
+    rows = manifest.read_manifest(data_dir / "manifest/youtube/C.jsonl")
+    assert [(r["video_id"], r["status"]) for r in rows] == [("NEW00000001", "pending")]
+
+
+def test_log_file_option(data_dir, feed, tmp_path):
+    import logging
+    root = logging.getLogger()
+    saved, level = root.handlers[:], root.level
+    root.handlers.clear()
+    try:
+        log_file = tmp_path / "logs" / "watch.log"
+        assert watch.main(["--log-file", str(log_file), "list"]) == 0
+        logging.getLogger("watch").info("hello from the scheduled task")
+        for h in root.handlers:
+            h.flush()
+        assert "hello from the scheduled task" in log_file.read_text()
+    finally:
+        for h in root.handlers:
+            h.close()
+        root.handlers[:] = saved
+        root.setLevel(level)

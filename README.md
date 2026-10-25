@@ -11,7 +11,26 @@ clean (fillers, [Music], sponsor reads) ──► data/transcripts/{platform}/{c
 scripts/build_dataset.py ──► data/dataset/chunks.jsonl + qa.jsonl
 ```
 
-## Setup
+## Windows: one-click install
+
+1. On https://github.com/Ngoni-Sama/Apollo (signed in), click **Code → Download ZIP** and unzip it anywhere.
+2. Double-click **`install.bat`**. If Windows says "Windows protected your PC", click **More info → Run anyway**.
+3. Wait. It installs Python, Git, FFmpeg and Deno (only if missing), puts Apollo in `C:\Users\<you>\Apollo`
+   (a GitHub sign-in window may pop up: sign in), installs everything, and then:
+   - adds **Apollo** and **Update Apollo** shortcuts to your Desktop and Start menu
+   - schedules a hidden hourly check that queues **and transcribes** new uploads (log: `data\watch.log`)
+   - sets up **The Diary Of A CEO** (full episodes only), lists every episode and smoke-tests 3 of them
+   - opens Apollo and asks whether to start transcribing
+4. From then on: double-click **Apollo** on the Desktop. Close its black window to stop it.
+
+Run `install.bat` again any time: it skips whatever is already done. **Update Apollo** downloads fixes (close Apollo first).
+To set up a different channel: `install.bat -Channel @SomeCreator`. To skip the hourly task: `install.bat -NoSchedule`.
+To turn the hourly check off later: Task Scheduler → *Apollo - check for new videos* → Disable.
+
+Only one transcription job runs at a time: if the hourly check fires while you're transcribing in the app,
+it leaves new videos queued for later instead of running a second job.
+
+## Manual setup (macOS / Linux / advanced)
 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # 3.11+
@@ -107,4 +126,6 @@ New videos are logged to `data/watch_log.jsonl`. For phone alerts, set `WATCH_NT
 | yt-dlp "No supported JavaScript runtime" | Install deno, or set `YTDLP_JS_RUNTIMES=node`. |
 | Any yt-dlp extractor error | `pip install -U yt-dlp` first. Code changes are rarely needed. |
 | TikTok-Api `EmptyResponseException` / `InvalidResponseException` | Bot detection. Set `TIKTOK_MS_TOKEN` (the `msToken` cookie from a logged-in tiktok.com tab) and try `TIKTOK_HEADLESS=false`. Do not patch the library; the pipeline falls back to yt-dlp. |
+| Windows: YouTube cookies from Chrome/Edge fail | Chrome-based browsers encrypt cookies so other programs can't read them. Use Firefox: sign in to YouTube there, set `YTDLP_COOKIES_FROM_BROWSER=firefox`. |
+| Windows: GPU errors mentioning `cublas`/`cudnn` | Apollo falls back to CPU automatically. For GPU speed, install NVIDIA's CUDA 12 + cuDNN 9, or set `WHISPER_DEVICE=cpu` to skip the attempt. |
 | faster-whisper `unexpected keyword argument 'metadata_errors'` | PyAV ≥ 19 is installed. `requirements.txt` pins `av<19`. |

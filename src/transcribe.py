@@ -6,6 +6,7 @@ import argparse
 import functools
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,14 @@ BACKENDS = ("faster-whisper", "whisper.cpp")
 
 class TranscriptionError(Exception):
     pass
+
+
+# Keep ffmpeg / whisper-cli from flashing a console window when run from pythonw (scheduled task).
+_NO_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+
+
+def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", **_NO_WINDOW)
 
 
 @dataclass
@@ -47,7 +56,7 @@ def to_wav_16k(src: Path, dst: Path) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     cmd = [_require("ffmpeg"), "-nostdin", "-y", "-loglevel", "error", "-i", str(src),
            "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(dst)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = _run(cmd)
     if proc.returncode != 0:
         raise TranscriptionError(f"ffmpeg failed on {src}: {proc.stderr.strip()}")
     return dst
@@ -58,7 +67,7 @@ def extract_audio(video: Path, dst: Path) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     cmd = [_require("ffmpeg"), "-nostdin", "-y", "-loglevel", "error", "-i", str(video),
            "-vn", "-ac", "1", "-c:a", "libmp3lame", "-q:a", "4", str(dst)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = _run(cmd)
     if proc.returncode != 0:
         raise TranscriptionError(f"ffmpeg failed on {video}: {proc.stderr.strip()}")
     return dst
@@ -67,7 +76,7 @@ def extract_audio(video: Path, dst: Path) -> Path:
 def probe_duration(path: Path) -> float:
     cmd = [_require("ffprobe"), "-v", "error", "-show_entries", "format=duration",
            "-of", "default=nw=1:nk=1", str(path)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = _run(cmd)
     try:
         return float(proc.stdout.strip())
     except ValueError:
@@ -89,12 +98,21 @@ def _load_faster_whisper(model: str, device: str, cache_dir: str):
 
 
 def _transcribe_faster_whisper(audio: Path, settings: Settings, model: str, language: str | None) -> TranscriptionResult:
-    whisper = _load_faster_whisper(model, settings.whisper_device, str(settings.model_cache_dir))
-    seg_iter, info = whisper.transcribe(str(audio), language=language, vad_filter=True, beam_size=5)
-    segments = [
-        Segment(start=round(s.start, 3), end=round(s.end, 3), text=s.text.strip())
-        for s in seg_iter if s.text.strip()
-    ]
+    def run(device: str):
+        whisper = _load_faster_whisper(model, device, str(settings.model_cache_dir))
+        seg_iter, info = whisper.transcribe(str(audio), language=language, vad_filter=True, beam_size=5)
+        # segments are lazy: decoding (and any CUDA library error) happens while iterating
+        return [Segment(start=round(s.start, 3), end=round(s.end, 3), text=s.text.strip())
+                for s in seg_iter if s.text.strip()], info
+
+    try:
+        segments, info = run(settings.whisper_device)
+    except (RuntimeError, OSError) as exc:
+        # Typical on Windows: an NVIDIA GPU is present but cuBLAS/cuDNN DLLs are not installed.
+        if settings.whisper_device == "cpu" or not re.search(r"cuda|cublas|cudnn|\.dll", str(exc), re.I):
+            raise
+        log.warning("GPU transcription unavailable (%s); using CPU instead", exc)
+        segments, info = run("cpu")
     return TranscriptionResult(segments, info.language, round(info.duration, 2), "faster-whisper")
 
 
@@ -120,7 +138,7 @@ def _transcribe_whisper_cpp(audio: Path, settings: Settings, language: str | Non
         out_base = Path(tmp) / "out"
         cmd = [str(binary), "-m", str(model), "-f", str(wav), "-l", language or "auto",
                "-oj", "-of", str(out_base), "-np"]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = _run(cmd)
         if proc.returncode != 0:
             raise TranscriptionError(f"whisper.cpp failed ({proc.returncode}): {proc.stderr.strip()[-500:]}")
         data = json.loads(out_base.with_suffix(".json").read_text(encoding="utf-8"))

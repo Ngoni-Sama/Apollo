@@ -163,3 +163,27 @@ def test_job_runner_one_at_a_time_and_stop(tmp_path):
     _wait(done)
     d = done.as_dict()
     assert d["returncode"] == 2 and "blocking your IP" in d["outcome"] and d["lines"] == ["blocked"]
+
+
+def test_serve_when_port_taken_opens_existing(monkeypatch, caplog):
+    import logging
+    import socket
+    caplog.set_level(logging.INFO)
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    s.listen()
+    port = s.getsockname()[1]
+    opened = []
+    monkeypatch.setattr(ui.webbrowser, "open", opened.append)
+    try:
+        ui.serve(port, open_browser=True)  # returns instead of crashing
+    finally:
+        s.close()
+    assert opened == [f"http://127.0.0.1:{port}"] and "already" in caplog.text
+
+
+def test_job_output_is_utf8(tmp_path):
+    runner = ui.JobRunner(cwd=tmp_path)
+    job = runner.start("utf8", ["-c", "import sys; sys.stderr.write('I MUST Tell You The Truth ’ 🎙\\n')"])
+    _wait(job)
+    assert job.lines[0] == "I MUST Tell You The Truth ’ 🎙"

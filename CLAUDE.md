@@ -99,6 +99,7 @@ src/
   ui.py                # local web UI (stdlib http.server, 127.0.0.1 only); jobs = fixed CLI subprocesses, one at a time
   ui_static/index.html # the UI page: vanilla JS, data rendered via textContent only (titles come from external feeds)
   watch.py             # new-upload watcher: YouTube RSS feed / TikTok best-effort -> manifest (+ opt-in ntfy alert)
+  fileio.py            # OS-level file locks (fcntl/msvcrt) + atomic writes with Windows rename retry
   clean.py             # filler/noise removal, sponsor-segment heuristics
   chunk.py             # token-estimate chunking + topic tags
   pipeline.py          # orchestrator: URL / URL list / manifest -> transcript JSON
@@ -106,6 +107,8 @@ scripts/
   smoke_test.py        # per-stage PASS/FAIL on real URLs (+ --audio for offline ASR)
   build_dataset.py     # transcripts -> chunks.jsonl + qa.jsonl
 tests/                 # pytest, fully mocked
+install.bat, Apollo.bat, update.bat   # Windows entry points (CRLF, ASCII only; see .gitattributes)
+windows/install.ps1, update.ps1       # must stay PowerShell 5.1 compatible and ASCII-only (5.1 reads BOM-less files as ANSI)
 data/{transcripts,manifest,dataset,audio}/
 ```
 
@@ -120,6 +123,8 @@ Enumeration is separate from transcription. The manifest is the resume point. **
 - Manifest line: `{"video_id", "title", "url", "upload_date": "YYYYMMDD"|null, "status": "pending|done|failed"}` plus `attempts`/`error` once a video fails.
 - `pipeline.py --manifest` skips `done`, retries `failed` once (2 attempts total), then leaves it permanently failed. It saves after every item and logs counts at the end.
 - A platform block (`PlatformBlocked`) stops the run **without** consuming attempts (exit 2).
+- Concurrency: every manifest change goes through `manifest.update/add_items/patch` (file lock + re-read), never a
+  whole-file rewrite of a stale in-memory list. Transcription holds `pipeline.job_lock()`; a second job exits 3 (busy).
 - Creator = manifest filename stem; platform = parent dir name.
 - Throttle: `--sleep 2.0` default between downloads. Do not remove.
 - Never enumerate more than one channel per invocation without user confirmation.

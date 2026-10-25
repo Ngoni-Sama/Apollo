@@ -18,3 +18,7 @@ data/dataset/**/*.jsonl
 data/watchlist.json
 data/watch_log.jsonl
 !data/**/.gitkeep
+
+# runtime locks and logs
+*.lock
+data/*.log
