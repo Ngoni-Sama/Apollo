@@ -209,7 +209,7 @@ class App:
         if path == "/api/status":
             return self.status()
         if path == "/api/watchlist":
-            return [{k: e.get(k) for k in ("platform", "channel", "creator", "added_at", "last_checked")}
+            return [{k: e.get(k) for k in ("platform", "channel", "creator", "added_at", "last_checked", "skip_shorts")}
                     for e in watch.load_watchlist()]
         if path == "/api/manifests":
             return manifest_summaries()
@@ -236,7 +236,7 @@ class App:
             if not re.fullmatch(r"@?[\w.\-]{2,100}|UC[\w-]{22}|https://(www\.)?(youtube|tiktok)\.com/\S+", channel):
                 raise ApiError(HTTPStatus.BAD_REQUEST, "channel should look like @handle")
             try:
-                entry = watch.add(platform, channel, bool(body.get("backfill")))
+                entry = watch.add(platform, channel, bool(body.get("backfill")), bool(body.get("skip_shorts")))
             except ValueError as exc:
                 raise ApiError(HTTPStatus.CONFLICT, str(exc)) from exc
             except Exception as exc:  # network / lookup failures are shown to the user as-is
@@ -281,7 +281,7 @@ class App:
                 raise ApiError(HTTPStatus.NOT_FOUND, "add this creator first")
             args = ["src/enumerate.py", "--platform", platform, "--channel", entry["channel"]]
             if platform == "youtube":
-                tabs = body.get("tabs") or "videos,shorts"
+                tabs = body.get("tabs") or ("videos" if entry.get("skip_shorts") else "videos,shorts")
                 if not re.fullmatch(r"(videos|shorts|streams)(,(videos|shorts|streams))*", tabs):
                     raise ApiError(HTTPStatus.BAD_REQUEST, "bad tabs")
                 args += ["--tabs", tabs]

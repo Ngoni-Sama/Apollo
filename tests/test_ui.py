@@ -101,13 +101,13 @@ def test_watch_add_and_remove(server, monkeypatch):
     _, base = server
     added = {}
 
-    def fake_add(platform, channel, backfill=False):
-        added.update(platform=platform, channel=channel, backfill=backfill)
+    def fake_add(platform, channel, backfill=False, skip_shorts=False):
+        added.update(platform=platform, channel=channel, backfill=backfill, skip_shorts=skip_shorts)
         return {"creator": "coach", "seen": ["1", "2"]}
     monkeypatch.setattr(watch, "add", fake_add)
     status, body, _ = call(base, "/api/watch", {"platform": "tiktok", "channel": "@coach", "backfill": True})
     assert status == 200 and body == {"creator": "coach", "baseline": 2}
-    assert added == {"platform": "tiktok", "channel": "@coach", "backfill": True}
+    assert added == {"platform": "tiktok", "channel": "@coach", "backfill": True, "skip_shorts": False}
 
     status, _, _ = call(base, "/api/watch", {"platform": "youtube", "channel": "x; rm -rf /"})
     assert status == 400
@@ -133,11 +133,12 @@ def test_job_args_are_fixed_commands(data_dir):
     assert smoke == ["scripts/smoke_test.py", "--youtube", "https://youtu.be/a", "--tiktok", "https://www.tiktok.com/@x/video/1"]
 
 
-def test_enumerate_job_uses_watched_channel(data_dir, monkeypatch):
+@pytest.mark.parametrize("skip,tabs", [(False, "videos,shorts"), (True, "videos")])
+def test_enumerate_job_uses_watched_channel(data_dir, monkeypatch, skip, tabs):
     monkeypatch.setattr(watch, "load_watchlist",
-                        lambda: [{"platform": "youtube", "channel": "@Huber", "creator": "Huber"}])
+                        lambda: [{"platform": "youtube", "channel": "@Huber", "creator": "Huber", "skip_shorts": skip}])
     args = ui.App(runner=None)._job_args({"kind": "enumerate", "platform": "youtube", "creator": "Huber"})[1]
-    assert args == ["src/enumerate.py", "--platform", "youtube", "--channel", "@Huber", "--tabs", "videos,shorts"]
+    assert args == ["src/enumerate.py", "--platform", "youtube", "--channel", "@Huber", "--tabs", tabs]
 
 
 def _wait(job, timeout=10):

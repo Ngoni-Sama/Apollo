@@ -63,7 +63,7 @@ python src/enumerate.py --platform tiktok --channel "@creator"     # best-effort
 python src/pipeline.py --manifest data/manifest/tiktok/creator.jsonl
 
 # 3. watch creators for new uploads (YouTube: official RSS feed; TikTok: best-effort)
-python src/watch.py add --platform youtube --channel "@CreatorName"   # current uploads become the baseline
+python src/watch.py add --platform youtube --channel "@CreatorName" --skip-shorts   # current uploads = baseline; never queue Shorts
 python src/watch.py add --platform tiktok --channel "@creator"        # add --backfill to also queue current uploads
 python src/watch.py list
 python src/watch.py check --transcribe      # new videos -> manifest -> transcripts

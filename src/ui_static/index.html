@@ -150,11 +150,13 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px
       <div class="row">
         <select id="add-platform"><option value="youtube">YouTube</option><option value="tiktok">TikTok</option></select>
         <input type="text" id="add-channel" class="grow" placeholder="@handle">
+        <label class="check"><input type="checkbox" id="add-skip-shorts" checked> skip Shorts</label>
         <label class="check"><input type="checkbox" id="add-backfill"> also queue their latest uploads</label>
         <button class="btn primary" id="btn-add">Add</button>
       </div>
       <p class="muted small" style="margin:10px 0 0">
         New uploads are found by "Check for new videos". YouTube uses the official channel feed.
+        "Skip Shorts" applies to new uploads and to "List all videos" (Shorts are usually clips of full episodes).
         TikTok is best-effort: only the latest 10 videos are looked at, and checks can fail when TikTok blocks bots.
       </p>
     </div>
@@ -330,7 +332,8 @@ async function loadCreators() {
   tbody.replaceChildren(...rows.map(w => {
     const m = byKey[`${w.platform}/${w.creator}`] || { done: 0, pending: 0, failed: 0 };
     return h("tr", {},
-      h("td", {}, h("strong", {}, w.creator), h("div", { class: "muted small" }, platformLabel(w.platform), w.unwatched ? " · not watched" : "")),
+      h("td", {}, h("strong", {}, w.creator), h("div", { class: "muted small" }, platformLabel(w.platform), w.unwatched ? " · not watched" : "",
+        w.skip_shorts ? " · no Shorts" : "")),
       h("td", { class: "small", "data-label": "Last checked" }, w.unwatched ? "–" : fmtDate(w.last_checked)),
       h("td", { class: "num", "data-label": "Done" }, m.done), h("td", { class: "num", "data-label": "Waiting" }, m.pending),
       h("td", { class: "num", "data-label": "Failed" }, m.failed),
@@ -350,7 +353,8 @@ $("btn-add").addEventListener("click", async () => {
   if (!channel) return toast("Enter a @handle");
   const btn = $("btn-add"); btn.disabled = true; btn.textContent = "Adding…";
   try {
-    const r = await api("/api/watch", { platform: $("add-platform").value, channel, backfill: $("add-backfill").checked });
+    const r = await api("/api/watch", { platform: $("add-platform").value, channel, backfill: $("add-backfill").checked,
+      skip_shorts: $("add-skip-shorts").checked });
     toast(`Watching ${r.creator}. ${r.baseline} existing uploads recorded as the starting point.`);
     $("add-channel").value = ""; refresh();
   } catch (e) { toast(e.message); }

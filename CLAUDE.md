@@ -123,6 +123,7 @@ Enumeration is separate from transcription. The manifest is the resume point. **
 - Creator = manifest filename stem; platform = parent dir name.
 - Throttle: `--sleep 2.0` default between downloads. Do not remove.
 - Never enumerate more than one channel per invocation without user confirmation.
+- Per-creator `skip_shorts` (YouTube): Shorts are never queued by `watch.py`, and the UI's "List all videos" enumerates `--tabs videos` only.
 - `watch.py check` polls each watched channel once (YouTube RSS = 1 request/channel, TikTok = latest 10), with the same sleep between channels. Schedule it hourly at most.
 
 ---

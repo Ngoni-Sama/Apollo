@@ -110,3 +110,23 @@ def test_notify_is_noop_without_topic(monkeypatch):
     monkeypatch.delenv("WATCH_NTFY_TOPIC", raising=False)
     monkeypatch.setattr(watch.urllib.request, "urlopen", lambda *a, **k: pytest.fail("should not send"))
     watch.notify("t", "m")
+
+
+def test_skip_shorts_on_check_and_backfill(data_dir, feed):
+    # FEED has one regular video (NEW00000001) and one Short (OLD00000001, /shorts/ URL)
+    feed["items"] = watch.parse_youtube_feed(FEED)
+    entry = watch.add("youtube", "@Pod", backfill=True, skip_shorts=True)
+    assert entry["skip_shorts"] is True
+    rows = manifest.read_manifest(data_dir / "manifest/youtube/Pod.jsonl")
+    assert [r["video_id"] for r in rows] == ["NEW00000001"]  # the Short was not queued
+
+    # a new Short appears later: it is remembered as seen but never queued
+    short = dict(watch.parse_youtube_feed(FEED)[1], video_id="SHORT000002", url="https://www.youtube.com/shorts/SHORT000002")
+    feed["items"] = [short] + feed["items"]
+    assert watch.check(sleep=0) == ({}, [])
+    assert "SHORT000002" in watch.load_watchlist()[0]["seen"]
+
+
+def test_skip_shorts_ignored_for_tiktok(data_dir, monkeypatch):
+    monkeypatch.setattr(watch.enumerate_mod, "enumerate_tiktok", lambda channel, limit: [])
+    assert watch.add("tiktok", "@coach", skip_shorts=True)["skip_shorts"] is False

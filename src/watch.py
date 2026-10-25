@@ -48,6 +48,7 @@ class WatchEntry(TypedDict, total=False):
     creator: str       # manifest name: data/manifest/{platform}/{creator}.jsonl
     channel_id: str    # YouTube UC... id (for the RSS feed)
     seen: list[str]    # video ids already known (baseline + everything found since)
+    skip_shorts: bool  # YouTube: never queue Shorts (they're usually clips of full episodes)
     added_at: str
     last_checked: str
 
@@ -105,6 +106,10 @@ def fetch_youtube_feed(channel_id: str, timeout: float = 30.0) -> list[ManifestI
         return parse_youtube_feed(resp.read().decode("utf-8"))
 
 
+def is_short(item: ManifestItem) -> bool:
+    return "/shorts/" in item.get("url", "")
+
+
 def latest(entry: WatchEntry) -> list[ManifestItem]:
     if entry["platform"] == "youtube":
         return fetch_youtube_feed(entry["channel_id"])
@@ -129,19 +134,21 @@ def notify(title: str, message: str, url: str | None = None) -> None:
 
 # --- commands ---------------------------------------------------------------
 
-def add(platform: str, channel: str, backfill: bool = False) -> WatchEntry:
+def add(platform: str, channel: str, backfill: bool = False, skip_shorts: bool = False) -> WatchEntry:
     """Start watching a channel. By default the current uploads are the baseline (not queued)."""
     entries = load_watchlist()
     creator = safe_name(channel.rstrip("/").split("/")[-1])
     if any(e["platform"] == platform and e["creator"] == creator for e in entries):
         raise ValueError(f"already watching {platform}/{creator}")
-    entry = WatchEntry(platform=platform, channel=channel, creator=creator, seen=[], added_at=_now())
+    entry = WatchEntry(platform=platform, channel=channel, creator=creator, seen=[], added_at=_now(),
+                       skip_shorts=skip_shorts and platform == "youtube")
     if platform == "youtube":
         entry["channel_id"] = (channel if channel.startswith("UC") and len(channel) == 24
                                else downloader.channel_id(enumerate_mod.youtube_channel_url(channel, "videos")))
     current = latest(entry)
     if backfill:
-        items, added = manifest.merge(manifest.read_manifest(_manifest_path(entry)), current)
+        queue = [i for i in current if not (entry["skip_shorts"] and is_short(i))]
+        items, added = manifest.merge(manifest.read_manifest(_manifest_path(entry)), queue)
         manifest.write_manifest(_manifest_path(entry), items)
         log.info("queued %d current uploads in %s", added, _manifest_path(entry))
     entry["seen"] = [i["video_id"] for i in current]
@@ -179,8 +186,11 @@ def check(sleep: float = config.DEFAULT_SLEEP_SEC) -> tuple[dict[str, list[Manif
 
         path = _manifest_path(entry)
         known = set(entry.get("seen", [])) | {i["video_id"] for i in manifest.read_manifest(path)}
-        new = [i for i in current if i["video_id"] not in known]
-        entry["seen"] = (entry.get("seen", []) + [i["video_id"] for i in new])[-SEEN_CAP:]
+        unseen = [i for i in current if i["video_id"] not in known]
+        entry["seen"] = (entry.get("seen", []) + [i["video_id"] for i in unseen])[-SEEN_CAP:]
+        new = [i for i in unseen if not (entry.get("skip_shorts") and is_short(i))]
+        if len(new) != len(unseen):
+            log.info("%s: skipped %d new Short(s)", name, len(unseen) - len(new))
         entry["last_checked"] = _now()
         if not new:
             log.info("%s: nothing new", name)
@@ -209,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--channel", required=True, help='"@handle" (YouTube also accepts a UC... id or channel URL)')
         if name == "add":
             p.add_argument("--backfill", action="store_true", help="also queue the current latest uploads")
+            p.add_argument("--skip-shorts", action="store_true", help="YouTube: never queue Shorts")
     sub.add_parser("list")
     p = sub.add_parser("check")
     p.add_argument("--transcribe", action="store_true", help="run the pipeline on manifests that got new videos")
@@ -219,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "add":
         try:
-            add(args.platform, args.channel, args.backfill)
+            add(args.platform, args.channel, args.backfill, args.skip_shorts)
         except (ValueError, downloader.DownloadFailed, URLError) as exc:
             log.error("could not add %s: %s", args.channel, exc)
             return 1
