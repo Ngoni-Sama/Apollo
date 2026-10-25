@@ -116,3 +116,18 @@ def list_flat(url: str, settings: Settings | None = None, limit: int | None = No
     except DownloadError as exc:
         raise DownloadFailed(f"listing failed for {url}: {exc}") from exc
     return [e for e in (info.get("entries") or []) if e]
+
+
+def channel_id(url: str, settings: Settings | None = None) -> str:
+    """Resolve a channel URL (e.g. https://www.youtube.com/@handle/videos) to its UC... channel id."""
+    settings = settings or load_settings()
+    opts = _base_opts(settings) | {"extract_flat": "in_playlist", "skip_download": True, "playlistend": 1}
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError as exc:
+        raise DownloadFailed(f"channel lookup failed for {url}: {exc}") from exc
+    cid = info.get("channel_id") or ""
+    if not cid.startswith("UC"):
+        raise DownloadFailed(f"no channel id found for {url}")
+    return cid

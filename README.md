@@ -49,7 +49,13 @@ python src/pipeline.py --manifest data/manifest/youtube/CreatorName.jsonl
 python src/enumerate.py --platform tiktok --channel "@creator"     # best-effort, may be partial
 python src/pipeline.py --manifest data/manifest/tiktok/creator.jsonl
 
-# 3. build training data
+# 3. watch creators for new uploads (YouTube: official RSS feed; TikTok: best-effort)
+python src/watch.py add --platform youtube --channel "@CreatorName"   # current uploads become the baseline
+python src/watch.py add --platform tiktok --channel "@creator"        # add --backfill to also queue current uploads
+python src/watch.py list
+python src/watch.py check --transcribe      # new videos -> manifest -> transcripts
+
+# 4. build training data
 python scripts/build_dataset.py [--creator CreatorName] [--max-tokens 400 --overlap 50]
 
 # transcribe a local file
@@ -57,6 +63,17 @@ python src/transcribe.py --file path/to/audio.mp3 --backend faster-whisper
 ```
 
 Run the tests with `pytest`. They are fully mocked and never touch the network.
+
+## Getting new-video updates
+
+Schedule `watch.py check` on your own machine. Downloads must come from a home connection because cloud IPs are blocked.
+
+- **macOS/Linux** (`crontab -e`, hourly at :17):
+  `17 * * * * cd /path/to/Apollo && .venv/bin/python src/watch.py check --transcribe >> data/watch.log 2>&1`
+- **Windows** (Task Scheduler, hourly):
+  `schtasks /Create /SC HOURLY /TN Apollo-watch /TR "C:\path\to\Apollo\.venv\Scripts\python.exe C:\path\to\Apollo\src\watch.py check --transcribe"`
+
+New videos are logged to `data/watch_log.jsonl`. For phone alerts, set `WATCH_NTFY_TOPIC` in `.env` and subscribe to that topic in the free [ntfy](https://ntfy.sh) app. The YouTube feed shows the latest ~15 uploads, so hourly or daily checks never miss one. TikTok checks only look at the latest 10 videos and can fail under bot detection.
 
 ## Behaviour worth knowing
 

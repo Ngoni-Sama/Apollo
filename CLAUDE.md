@@ -96,6 +96,7 @@ src/
   transcribe.py        # faster-whisper / whisper.cpp adapter + ffmpeg helpers
   manifest.py          # manifest JSONL I/O (kept out of enumerate.py: `import enumerate` would shadow the builtin)
   enumerate.py         # channel -> manifest
+  watch.py             # new-upload watcher: YouTube RSS feed / TikTok best-effort -> manifest (+ opt-in ntfy alert)
   clean.py             # filler/noise removal, sponsor-segment heuristics
   chunk.py             # token-estimate chunking + topic tags
   pipeline.py          # orchestrator: URL / URL list / manifest -> transcript JSON
@@ -120,6 +121,7 @@ Enumeration is separate from transcription. The manifest is the resume point. **
 - Creator = manifest filename stem; platform = parent dir name.
 - Throttle: `--sleep 2.0` default between downloads. Do not remove.
 - Never enumerate more than one channel per invocation without user confirmation.
+- `watch.py check` polls each watched channel once (YouTube RSS = 1 request/channel, TikTok = latest 10), with the same sleep between channels. Schedule it hourly at most.
 
 ---
 

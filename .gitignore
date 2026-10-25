@@ -15,4 +15,6 @@ data/audio/
 data/transcripts/**/*.json
 data/manifest/**/*.jsonl
 data/dataset/**/*.jsonl
+data/watchlist.json
+data/watch_log.jsonl
 !data/**/.gitkeep
